@@ -390,9 +390,15 @@ public final class DiskLruCache implements Closeable {
          * from different edits.
          */
         InputStream[] ins = new InputStream[valueCount];
+        long lastModified = 0;
         try {
             for (int i = 0; i < valueCount; i++) {
-                ins[i] = new FileInputStream(entry.getCleanFile(i));
+            	File f = entry.getCleanFile(i);
+            	long lm = f.lastModified();
+            	if (lm > lastModified) { 
+            		lastModified = lm;
+            	}
+                ins[i] = new FileInputStream(f);
             }
         } catch (FileNotFoundException e) {
             // a file must have been deleted manually!
@@ -405,7 +411,7 @@ public final class DiskLruCache implements Closeable {
             executorService.submit(cleanupCallable);
         }
 
-        return new Snapshot(key, entry.sequenceNumber, ins, entry.lengths);
+        return new Snapshot(key, entry.sequenceNumber, ins, entry.lengths, lastModified);
     }
 
     /**
@@ -647,12 +653,14 @@ public final class DiskLruCache implements Closeable {
         private final long sequenceNumber;
         private final InputStream[] ins;
         private final long[] lengths;
+        private final long lastModifiedDate;
 
-        private Snapshot(String key, long sequenceNumber, InputStream[] ins, long[] lengths) {
+        private Snapshot(String key, long sequenceNumber, InputStream[] ins, long[] lengths, long lastModifiedDate) {
             this.key = key;
             this.sequenceNumber = sequenceNumber;
             this.ins = ins;
             this.lengths = lengths;
+            this.lastModifiedDate = lastModifiedDate;
         }
 
         /**
@@ -669,6 +677,10 @@ public final class DiskLruCache implements Closeable {
          */
         public InputStream getInputStream(int index) {
             return ins[index];
+        }
+        
+        public long getLastModified() {
+        	return lastModifiedDate;
         }
 
         /**
